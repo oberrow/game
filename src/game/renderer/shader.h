@@ -37,6 +37,8 @@ namespace renderer
         GLint Link();
         GLint Use();
 
+        GLuint GetUniformLocation(const char* uniformName);
+
         std::string GetLinkMessages() const;
 
         ~Program();

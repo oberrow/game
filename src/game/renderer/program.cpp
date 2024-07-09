@@ -4,13 +4,13 @@
  * Copyright (c) 2024 Omar Berrow
 */
 
-#include "renderer/shader.h"
 #include <stddef.h>
 
 #include <GL/glew.h>
 #include <GL/gl.h>
 
-#include <string_view>
+#include <renderer/shader.h>
+
 #include <string>
 #include <mutex>
 #include <list>
@@ -63,6 +63,14 @@ namespace renderer
             return GL_FALSE;
         glUseProgram(m_programId);
         return GL_TRUE;
+    }
+    GLuint Program::GetUniformLocation(const char* uniformName)
+    {
+        if (!m_initialized)
+            throw std::runtime_error{ "Program is uninitialized before call to GetUniformLocation()! This is a bug, please report it.\n"};
+        if (!m_linkSuccess)
+            return (GLuint)-1;
+        return glGetUniformLocation(m_programId, uniformName);
     }
     Program::~Program()
     {

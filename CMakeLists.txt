@@ -21,6 +21,7 @@ if (GAME_REFRESH_DEPENDENCIES)
 	file(MAKE_DIRECTORY "dependencies/include")
 	include("dependencies/glfw.cmake")
 	include("dependencies/glew.cmake")
+	# include("dependencies/glm.cmake")
 	file (WRITE "${CMAKE_SOURCE_DIR}/dependencies/needs_download.cmake"
 		"# This file is auto-generated.\n# Set this variable to true or delete this file to refresh all dependencies.\nset (GAME_REFRESH_DEPENDENCIES false)"
 	)

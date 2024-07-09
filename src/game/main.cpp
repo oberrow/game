@@ -17,7 +17,52 @@
 
 #include <renderer/shader.h>
 
+#include <glm/ext/matrix_float4x4.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/transform.hpp>
+#include <glm/trigonometric.hpp>
+#include <glm/ext/matrix_clip_space.hpp>
+
 GLFWwindow* g_window;
+
+static const GLfloat mesh[] = {
+    -1.0f,-1.0f,-1.0f, // triangle 1 : begin
+    -1.0f,-1.0f, 1.0f,
+    -1.0f, 1.0f, 1.0f, // triangle 1 : end
+    1.0f, 1.0f,-1.0f, // triangle 2 : begin
+    -1.0f,-1.0f,-1.0f,
+    -1.0f, 1.0f,-1.0f, // triangle 2 : end
+    1.0f,-1.0f, 1.0f,
+    -1.0f,-1.0f,-1.0f,
+    1.0f,-1.0f,-1.0f,
+    1.0f, 1.0f,-1.0f,
+    1.0f,-1.0f,-1.0f,
+    -1.0f,-1.0f,-1.0f,
+    -1.0f,-1.0f,-1.0f,
+    -1.0f, 1.0f, 1.0f,
+    -1.0f, 1.0f,-1.0f,
+    1.0f,-1.0f, 1.0f,
+    -1.0f,-1.0f, 1.0f,
+    -1.0f,-1.0f,-1.0f,
+    -1.0f, 1.0f, 1.0f,
+    -1.0f,-1.0f, 1.0f,
+    1.0f,-1.0f, 1.0f,
+    1.0f, 1.0f, 1.0f,
+    1.0f,-1.0f,-1.0f,
+    1.0f, 1.0f,-1.0f,
+    1.0f,-1.0f,-1.0f,
+    1.0f, 1.0f, 1.0f,
+    1.0f,-1.0f, 1.0f,
+    1.0f, 1.0f, 1.0f,
+    1.0f, 1.0f,-1.0f,
+    -1.0f, 1.0f,-1.0f,
+    1.0f, 1.0f, 1.0f,
+    -1.0f, 1.0f,-1.0f,
+    -1.0f, 1.0f, 1.0f,
+    1.0f, 1.0f, 1.0f,
+    -1.0f, 1.0f, 1.0f,
+    1.0f,-1.0f, 1.0f
+};
 
 int main()
 {
@@ -57,7 +102,10 @@ int main()
         return 1;
     }
     glfwMakeContextCurrent(g_window);
+    // glfwSwapInterval(0);
     glewExperimental = true;
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
     printf("%s: Initializing GLEW.\n", __func__);
     GLenum err = glewInit();
     if (err != GLEW_OK)
@@ -68,25 +116,18 @@ int main()
 
     printf("%s: Using GLEW %s.\n", __func__, glewGetString(GLEW_VERSION));
 
-    static const GLfloat triangle[] = {
-       -0.5f, -0.5f, 0.0f, 1.0f, 0.0f, 0.0f,
-       0.5f, -0.5f, 0.0f, 0.0f, 1.0f, 0.0f,
-       0.0f,  0.5f, 0.0f, 0.0f, 0.0f, 1.0f,
-    };
-
     renderer::Shader vertexShader{ renderer::ShaderType::Vertex };
     renderer::Shader fragmentShader{ renderer::ShaderType::Fragment };
     GLint status = vertexShader.CompileShader(""
         "#version 330 core\n"
         "layout(location = 0) in vec3 vertexPos;\n"
-        "layout(location = 1) in vec3 vertexColor;\n"
-        "out vec3 fragColor;\n"
+        "uniform mat4 MVP;\n"
+        "out vec3 vertexColour;\n"
         "\n"
         "void main()\n"
         "{\n"
-        "   gl_Position.xyz = vertexPos;\n"
-        "   gl_Position.w = 1.0;\n"
-        "   fragColor = vertexColor;\n"
+        "   gl_Position = MVP * vec4(vertexPos, 1);\n"
+        "   vertexColour = vertexPos;\n"
         "}"
     );
     if (!status)
@@ -98,13 +139,14 @@ int main()
     status = fragmentShader.CompileShader(""
         "#version 330 core\n"
         "out vec3 color;\n"
-        "in vec3 fragColor;\n"
+        "in vec3 vertexColour;\n"
         "\n"
-        "void main()"
+        "void main()\n"
         "{\n"
-        "   color = fragColor;\n"
+        "   color = vertexColour;\n"
         "}"
     );
+    
     if (!status)
     {
         fprintf(stderr, "Fragment shader failed compile!\n%s\n", fragmentShader.GetCompileMessages().data());
@@ -121,25 +163,38 @@ int main()
     GLuint vb = 0;
     glGenBuffers(1, &vb);
     glBindBuffer(GL_ARRAY_BUFFER, vb);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(triangle), triangle, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(mesh), mesh, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_TRUE, 0, (void*)0);
+    glm::mat4 view = glm::lookAt(
+        glm::vec3(5,3,3),
+        glm::vec3(0,0,0),
+        glm::vec3(0,1,0)
+    );
+    glm::mat4 projection = glm::perspective(
+        glm::radians(45.0f),
+        1080.0f / 780.0f,
+        0.1f,
+        100.0f
+    );
+    glm::mat4 mvp = projection*view*glm::mat4(1.0f);
+    program.Use();
+    GLuint MatrixID = program.GetUniformLocation("MVP");
     while (!glfwWindowShouldClose(g_window))
     {
-        auto start = std::chrono::system_clock::now().time_since_epoch().count();
+        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
-        glClear(GL_COLOR_BUFFER_BIT);
+        auto start = std::chrono::system_clock::now().time_since_epoch().count();
 
         // Render shit here.
         
         // Draw the triangle.
         program.Use();
+        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &mvp[0][0]);
         glBindBuffer(GL_ARRAY_BUFFER, vb);
-        glEnableVertexAttribArray(0);
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)0);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (void*)(3 * sizeof(GLfloat)));
-        glDrawArrays(GL_TRIANGLES, 0, 3);
-        glDisableVertexAttribArray(1);
-        glDisableVertexAttribArray(0);
+        glDrawArrays(GL_TRIANGLES, 0, 12*3);
+        // glDisableVertexAttribArray(1);
+        // glDisableVertexAttribArray(0);
 
         auto end = std::chrono::system_clock::now().time_since_epoch().count();
 
