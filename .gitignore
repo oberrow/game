@@ -1,0 +1,12 @@
+﻿/.vs
+/.vscode
+/.cache
+/CMakePresets.json
+/out
+/build
+/dependencies/include/
+/dependencies/needs_download.cmake
+/dependencies/GLFW
+/dependencies/GLFW_Build
+/dependencies/GLFW_Lib
+/dependencies/GLEW
