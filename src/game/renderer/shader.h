@@ -73,12 +73,12 @@ namespace renderer
         ~Shader();
         friend class Program;
     private:
-        bool m_initialized;
-        GLuint m_shaderId;
-        ShaderType m_type;
-        std::mutex m_lock;
-        std::string m_compileMessages;
-        bool m_compileSuccess;
+        bool m_initialized = false;
+        GLuint m_shaderId = 0;
+        ShaderType m_type = ShaderType::None;
+        std::mutex m_lock{};
+        std::string m_compileMessages{};
+        bool m_compileSuccess = false;
         Program* m_program = nullptr;
     };
 }

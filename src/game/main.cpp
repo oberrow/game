@@ -9,13 +9,17 @@
 
 #include <GLFW/glfw3.h>
 
+#include <glm/ext/matrix_transform.hpp>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <chrono>
-#include <unistd.h>
+#include <string>
 
 #include <renderer/shader.h>
+#include <renderer/vao.h>
+#include <renderer/mesh.h>
+#include <renderer/controls.h>
 
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -23,50 +27,23 @@
 #include <glm/trigonometric.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
 
+#include <file.h>
+#include <logger.h>
+
 GLFWwindow* g_window;
 
-static const GLfloat mesh[] = {
-    -1.0f,-1.0f,-1.0f, // triangle 1 : begin
-    -1.0f,-1.0f, 1.0f,
-    -1.0f, 1.0f, 1.0f, // triangle 1 : end
-    1.0f, 1.0f,-1.0f, // triangle 2 : begin
-    -1.0f,-1.0f,-1.0f,
-    -1.0f, 1.0f,-1.0f, // triangle 2 : end
-    1.0f,-1.0f, 1.0f,
-    -1.0f,-1.0f,-1.0f,
-    1.0f,-1.0f,-1.0f,
-    1.0f, 1.0f,-1.0f,
-    1.0f,-1.0f,-1.0f,
-    -1.0f,-1.0f,-1.0f,
-    -1.0f,-1.0f,-1.0f,
-    -1.0f, 1.0f, 1.0f,
-    -1.0f, 1.0f,-1.0f,
-    1.0f,-1.0f, 1.0f,
-    -1.0f,-1.0f, 1.0f,
-    -1.0f,-1.0f,-1.0f,
-    -1.0f, 1.0f, 1.0f,
-    -1.0f,-1.0f, 1.0f,
-    1.0f,-1.0f, 1.0f,
-    1.0f, 1.0f, 1.0f,
-    1.0f,-1.0f,-1.0f,
-    1.0f, 1.0f,-1.0f,
-    1.0f,-1.0f,-1.0f,
-    1.0f, 1.0f, 1.0f,
-    1.0f,-1.0f, 1.0f,
-    1.0f, 1.0f, 1.0f,
-    1.0f, 1.0f,-1.0f,
-    -1.0f, 1.0f,-1.0f,
-    1.0f, 1.0f, 1.0f,
-    -1.0f, 1.0f,-1.0f,
-    -1.0f, 1.0f, 1.0f,
-    1.0f, 1.0f, 1.0f,
-    -1.0f, 1.0f, 1.0f,
-    1.0f,-1.0f, 1.0f
-};
-
-int main()
+int main(int argc, const char** argv)
 {
-    printf("%s: Starting GLFW.\n", __func__);
+    if (argc >= 2)
+    {
+        logger::log_level logLevel = (logger::log_level)std::atoi(argv[1]);
+        logger::SetLogLevel(logLevel);
+    }
+    else {
+        logger::SetLogLevel(logger::log_level::Log);
+    }
+    logger::Log("Initializing renderer.\n");
+    logger::Debug("%s: Starting GLFW.\n", __func__);
 
 #ifdef __linux__
     glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
@@ -75,46 +52,58 @@ int main()
     glewExperimental = true;
     if (!glfwInit())
     {
-        fprintf(stderr, "%s: Could not initialize GLFW.\n", __func__);
+        logger::Error("%s: Could not initialize GLFW.\n", __func__);
         return 1;
     }
 
 #ifdef __linux__
     if (glfwGetPlatform() != GLFW_PLATFORM_X11)
     {
-        fprintf(stderr, "Fatal error: GLFW is not using X11 as the windowing system.\n");
+        logger::Error("Fatal error: GLFW is not using X11 as the windowing system.\n");
         return 2;
     }
 #endif
 
-    printf("%s: Opening window.\n", __func__);
+    logger::Debug("%s: Opening window.\n", __func__);
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    g_window = glfwCreateWindow(1080, 780, "Game", nullptr, nullptr);
+    g_window = glfwCreateWindow(1024, 768, "Game", nullptr, nullptr);
     if (!g_window)
     {
-        fprintf(stderr, "%s: Could not open window.", __func__);
+        logger::Error("%s: Could not open window.", __func__);
         glfwTerminate();
         return 1;
     }
     glfwMakeContextCurrent(g_window);
     // glfwSwapInterval(0);
     glewExperimental = true;
+    glfwSwapInterval(1);
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
     glDepthFunc(GL_LESS);
-    printf("%s: Initializing GLEW.\n", __func__);
+
+    int screenWidth = 0;
+    int screenHeight = 0;
+    glfwGetWindowSize(g_window, &screenWidth, &screenHeight);
+
+    glfwSetInputMode(g_window, GLFW_STICKY_KEYS, GL_TRUE);
+    glfwSetInputMode(g_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwPollEvents();
+    glfwSetCursorPos(g_window, screenWidth/2.f, screenHeight/2.f);
+    
+    logger::Debug("%s: Initializing GLEW.\n", __func__);
     GLenum err = glewInit();
     if (err != GLEW_OK)
     {
-        fprintf(stderr, "%s: Could not initialize GLEW. Error: %s\n", __func__, glewGetErrorString(err));
+        logger::Error("%s: Could not initialize GLEW. Error: %s\n", __func__, glewGetErrorString(err));
         return 1;
     }
 
-    printf("%s: Using GLEW %s.\n", __func__, glewGetString(GLEW_VERSION));
+    logger::Debug("%s: Using GLEW %s.\n", __func__, glewGetString(GLEW_VERSION));
 
     renderer::Shader vertexShader{ renderer::ShaderType::Vertex };
     renderer::Shader fragmentShader{ renderer::ShaderType::Fragment };
@@ -126,13 +115,13 @@ int main()
         "\n"
         "void main()\n"
         "{\n"
-        "   gl_Position = MVP * vec4(vertexPos, 1);\n"
-        "   vertexColour = vertexPos;\n"
+        "   gl_Position = MVP * vec4(vertexPos, 1.0);\n"
+        "   vertexColour = vertexPos.xyz;\n"
         "}"
     );
     if (!status)
     {
-        fprintf(stderr, "Vertex shader failed compile!\n%s\n", vertexShader.GetCompileMessages().data());
+        logger::Error("Vertex shader failed compile!\n%s\n", vertexShader.GetCompileMessages().data());
         glfwTerminate();
         return 1;
     }
@@ -149,56 +138,52 @@ int main()
     
     if (!status)
     {
-        fprintf(stderr, "Fragment shader failed compile!\n%s\n", fragmentShader.GetCompileMessages().data());
+        logger::Error("Fragment shader failed compile!\n%s\n", fragmentShader.GetCompileMessages().data());
         glfwTerminate();
         return 1;
     }
     renderer::Program program;
     vertexShader.BindShader(program);
     fragmentShader.BindShader(program);
+    
     program.Link();
-    GLuint vao = 0;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-    GLuint vb = 0;
-    glGenBuffers(1, &vb);
-    glBindBuffer(GL_ARRAY_BUFFER, vb);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(mesh), mesh, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_TRUE, 0, (void*)0);
-    glm::mat4 view = glm::lookAt(
-        glm::vec3(5,3,3),
-        glm::vec3(0,0,0),
-        glm::vec3(0,1,0)
-    );
-    glm::mat4 projection = glm::perspective(
-        glm::radians(45.0f),
-        1080.0f / 780.0f,
-        0.1f,
-        100.0f
-    );
-    glm::mat4 mvp = projection*view*glm::mat4(1.0f);
+    renderer::VAO vao;
+    renderer::Mesh meshObj;
+    std::string dat = "";
+    if (!utility::LoadFile("cube.obj", dat))
+    {
+        logger::Error("Could not find file %s.", "cube.obj");
+        glfwTerminate();
+        return 1;
+    }
+    meshObj.Load(dat.c_str(), dat.length());
+    meshObj.Bind(vao);
+    meshObj.SetVAAIndex(0);
     program.Use();
     GLuint MatrixID = program.GetUniformLocation("MVP");
+    glClearColor(1,1,1,1);
+    logger::Log("Initialized renderer.\n");
     while (!glfwWindowShouldClose(g_window))
     {
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+
+        renderer::CalculateNewMatrices();
+        glm::mat4 mvp1 = renderer::ProjectionMatrix*renderer::ViewMatrix*glm::mat4(1.0f);
+        glm::mat4 mvp2 = renderer::ProjectionMatrix*renderer::ViewMatrix*glm::translate(
+            glm::mat4(1.0f), glm::vec3(5,0,0));
 
         auto start = std::chrono::system_clock::now().time_since_epoch().count();
 
         // Render shit here.
         
-        // Draw the triangle.
-        program.Use();
-        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &mvp[0][0]);
-        glBindBuffer(GL_ARRAY_BUFFER, vb);
-        glDrawArrays(GL_TRIANGLES, 0, 12*3);
-        // glDisableVertexAttribArray(1);
-        // glDisableVertexAttribArray(0);
+        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &mvp1[0][0]);
+        vao.Render();
+        glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &mvp2[0][0]);
+        vao.Render();
 
         auto end = std::chrono::system_clock::now().time_since_epoch().count();
 
-        fprintf(stderr, "\rFPS: %f", 1.0f/(end-start)*std::chrono::system_clock::duration::period::den);
+        logger::Debug("\rFPS: %f", 1.0f/(end-start)*std::chrono::system_clock::duration::period::den);
 
         glfwSwapBuffers(g_window);
         glfwPollEvents();
