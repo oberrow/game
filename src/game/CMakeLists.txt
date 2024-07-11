@@ -6,7 +6,7 @@ list (APPEND game_sources
     "main.cpp" "renderer/shader.h" "renderer/shader.cpp"  "renderer/program.cpp"
     "renderer/vao.h" "renderer/vao.cpp" "renderer/mesh.h" "renderer/mesh.cpp"
     "logger.h" "logger.cpp" "file.h" "renderer/controls.h" "renderer/controls.cpp"
-    "renderer/window_callbacks.h" "renderer/window_callbacks.cpp"
+    "renderer/window_callbacks.h" "renderer/window_callbacks.cpp" "renderer/texture.h" "renderer/texture.cpp"
 )
 
 add_executable(game)

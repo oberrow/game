@@ -4,6 +4,7 @@
  * Copyright (c) 2024 Omar Berrow
 */
 
+#include "renderer/texture.h"
 #include <GL/glew.h>
 #include <GL/gl.h>
 
@@ -30,6 +31,7 @@
 
 #include <file.h>
 #include <logger.h>
+#include <sys/types.h>
 
 GLFWwindow* g_window;
 
@@ -87,7 +89,6 @@ int main(int argc, const char** argv)
     glEnable(GL_CULL_FACE);
     glDepthFunc(GL_LESS);
 
-
     logger::Debug("%s: Initializing GLEW.\n", __func__);
     GLenum err = glewInit();
     if (err != GLEW_OK)
@@ -103,13 +104,14 @@ int main(int argc, const char** argv)
     GLint status = vertexShader.CompileShader(""
         "#version 330 core\n"
         "layout(location = 0) in vec3 vertexPos;\n"
+        "layout(location = 1) in vec2 vertexUV;\n"
         "uniform mat4 MVP;\n"
-        "out vec3 vertexColour;\n"
+        "out vec2 uv;\n"
         "\n"
         "void main()\n"
         "{\n"
         "   gl_Position = MVP * vec4(vertexPos, 1.0);\n"
-        "   vertexColour = vertexPos.xyz;\n"
+        "   uv = vec2(vertexUV.x, 1.0-vertexUV.y);\n"
         "}"
     );
     if (!status)
@@ -120,12 +122,13 @@ int main(int argc, const char** argv)
     }
     status = fragmentShader.CompileShader(""
         "#version 330 core\n"
-        "out vec3 color;\n"
-        "in vec3 vertexColour;\n"
+        "out vec4 color;\n"
+        "in vec2 uv;\n"
+        "uniform sampler2D textureSampler;\n"
         "\n"
         "void main()\n"
         "{\n"
-        "   color = vertexColour;\n"
+        "   color = texture(textureSampler, uv).rgba;\n"
         "}"
     );
 
@@ -142,19 +145,39 @@ int main(int argc, const char** argv)
     program.Link();
     renderer::VAO vao;
     renderer::Mesh meshObj;
+    renderer::Texture textureObj;
     std::string dat = "";
+    std::vector<uint8_t> texture;
     if (!utility::LoadFile("cube.obj", dat))
     {
         logger::Error("Could not find file %s.", "cube.obj");
         glfwTerminate();
         return 1;
     }
-    meshObj.Load(dat.c_str(), dat.length());
-    meshObj.Bind(vao);
+    if (!utility::LoadFile("cube.dds", texture))
+    {
+        logger::Error("Could not find file %s.", "cube.dds");
+        glfwTerminate();
+        return 1;
+    }
+    std::vector<GLfloat> vertices, textureCoords, normals;
+    std::vector<GLuint> indices;
+    if (!renderer::LoadMesh(dat.c_str(), dat.length(), vertices, indices, textureCoords, normals))
+    {
+        glfwTerminate();
+        return 1;
+    }
     meshObj.SetVAAIndex(0);
+    meshObj.Load(vertices, indices);
+    textureObj.Load(texture.data(), texture.size(), textureCoords);
+    textureObj.SetVAAIndex(1);
+    textureObj.Bind(vao);
+    meshObj.Bind(vao);
     program.Use();
     GLuint MatrixID = program.GetUniformLocation("MVP");
-    glClearColor(1,1,1,1);
+    GLuint TextureSamplerId = program.GetUniformLocation("textureSampler");
+    textureObj.SetTextureSamplerUniform(TextureSamplerId);
+    glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
     renderer::EnableControls();
     logger::Log("Initialized renderer.\n");
     while (!glfwWindowShouldClose(g_window))
@@ -166,8 +189,10 @@ int main(int argc, const char** argv)
             glm::mat4(1.0f), glm::vec3(5,0,0));
 
         auto start = std::chrono::system_clock::now().time_since_epoch().count();
-
+    
         // Render shit here.
+
+        program.Use();
 
         glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &mvp1[0][0]);
         vao.Render();

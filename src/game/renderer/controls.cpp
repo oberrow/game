@@ -20,9 +20,13 @@ extern GLFWwindow* g_window;
 static float horizontalAngle = 0.f;
 static float verticalAngle = 0.0f;
 
-static float speed = 0.5f;
-static const float speedCap = 3.f;
-static const float speedInterval = .2f;
+static const float initialSpeedWalk = 0.15f;
+static const float initialSpeedSprint = 0.35f;
+static const float speedCapWalk = 4.f;
+static const float speedCapSprint = 6.f;
+static const float speedIntervalWalk = .1f;
+static const float speedIntervalSprint = .3f;
+static float speed = 0;
 static float mouseSpeed = 0.0035f;
 
 namespace renderer
@@ -30,7 +34,7 @@ namespace renderer
     glm::mat4 ViewMatrix{ 0 };
     glm::mat4 ProjectionMatrix{ 0 };
     
-    float g_fov = 45.0f;
+    float g_fov = 60.0f;
     glm::vec3 g_position = glm::vec3( 0, 3, 0 ); 
     static bool enabled = true;
     static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -45,7 +49,7 @@ namespace renderer
         enabled = true;
         glfwSetCursorPosCallback(g_window, cursor_position_callback);
         glfwSetKeyCallback(g_window, key_callback);
-        glfwSetInputMode(g_window, GLFW_STICKY_KEYS, GL_FALSE);
+        glfwSetInputMode(g_window, GLFW_STICKY_KEYS, GL_TRUE);
         glfwSetInputMode(g_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         glfwSetWindowFocusCallback(g_window, renderer::OnFocusCallback);
         glfwSetWindowSizeCallback(g_window, renderer::OnResizeCallback);
@@ -66,103 +70,77 @@ namespace renderer
         static bool isSPressed = false;
         static bool isAPressed = false;
         static bool isDPressed = false;
-        if (action == GLFW_PRESS || action == GLFW_REPEAT)
+        
+        static bool isCtrlPressed = false;
+        static bool isEscPressed = false;
+        
+        switch (key)
         {
-            static double lastTime = glfwGetTime();
+        case GLFW_KEY_W: isWPressed = action == GLFW_PRESS || action == GLFW_REPEAT; break;
+        case GLFW_KEY_S: isSPressed = action == GLFW_PRESS || action == GLFW_REPEAT; break;
+        case GLFW_KEY_A: isAPressed = action == GLFW_PRESS || action == GLFW_REPEAT; break;
+        case GLFW_KEY_D: isDPressed = action == GLFW_PRESS || action == GLFW_REPEAT; break;
+        case GLFW_KEY_ESCAPE: isEscPressed = action == GLFW_PRESS || action == GLFW_REPEAT; break;
+        default: return;
+        }
+        bool prevCtrlStatus = isCtrlPressed;
+        isCtrlPressed = (mods & GLFW_MOD_CONTROL);
+        const float initialSpeed = isCtrlPressed ? initialSpeedSprint : initialSpeedWalk;
+        const float speedCap = isCtrlPressed ? speedCapSprint : speedCapWalk;
+        const float speedInterval = isCtrlPressed ? speedIntervalSprint : speedIntervalWalk;
+        if (!isWPressed && !isSPressed && !isAPressed && !isDPressed)
+            speed = initialSpeed;
+        if (prevCtrlStatus != isCtrlPressed)
+            if (speed > speedCapWalk)
+                speed = speedCapWalk; // Slow down.
+        static double lastTime = glfwGetTime();
+        double currentTime = glfwGetTime();
+        float deltaTime = float(currentTime - lastTime);
+        if (isWPressed)
+        {
+            if (!enabled)
+                    return;
+            g_position += direction * deltaTime * speed;
+            if (speed < speedCap)
+                speed += speedInterval;
+        }
+        if (isSPressed)
+        {
             if (!enabled)
                 return;
-
-            double currentTime = glfwGetTime();
-            float deltaTime = float(currentTime - lastTime);
-            switch(key)
-            {
-                case GLFW_KEY_W:
-                {
-                    isWPressed = true;
-                    g_position += direction * deltaTime * speed;
-                    if (speed < speedCap)
-                        speed += speedInterval;
-                    // logger::Debug("Changed position to %lf,%lf,%lf.\n", g_position.x, g_position.y, g_position.z);
-                    break;
-                }
-                case GLFW_KEY_S:
-                {
-                    isSPressed = true;
-                    g_position -= direction * deltaTime * speed;
-                    if (speed < speedCap)
-                        speed += speedInterval;
-                    // logger::Debug("Changed position to %lf,%lf,%lf.\n", g_position.x, g_position.y, g_position.z);
-                    break;
-                }
-                case GLFW_KEY_D:
-                {
-                    isDPressed = true;
-                    g_position += right * deltaTime * speed;
-                    if (speed < speedCap)
-                        speed += speedInterval;
-                    // logger::Debug("Changed position to %lf,%lf,%lf.\n", g_position.x, g_position.y, g_position.z);
-                    break;
-                }
-                case GLFW_KEY_A:
-                {
-                    isAPressed = true;
-                    g_position -= right * deltaTime * speed;
-                    if (speed < speedCap)
-                        speed += speedInterval;
-                    // logger::Debug("Changed position to %lf,%lf,%lf.\n", g_position.x, g_position.y, g_position.z);
-                    break;
-                }
-                case GLFW_KEY_ESCAPE:
-                {
-                    if (enabled)
-                        DisableControls();
-                    else
-                        EnableControls();
-                    break;
-                }
-                default: break;
-            }
-            ViewMatrix = glm::lookAt(
-                    g_position,
-                    g_position+direction,
-                    up
-                );
-            lastTime = currentTime;
+            g_position -= direction * deltaTime * speed;
+            if (speed < speedCap)
+                speed += speedInterval;
         }
-        else
+        if (isDPressed)
         {
-            bool isMovementKey = true;
-            switch(key)
-            {
-                case GLFW_KEY_W:
-                {
-                    isWPressed = false;
-                    break;
-                }
-                case GLFW_KEY_S:
-                {
-                    isSPressed = false;
-                    break;
-                }
-                case GLFW_KEY_D:
-                {
-                    isDPressed = false;
-                    break;
-                }
-                case GLFW_KEY_A:
-                {
-                    isAPressed = false;
-                    break;
-                }
-                default: isMovementKey = false; break;
-            }
-            if (isMovementKey && (
-                !isWPressed && !isSPressed &&
-                !isAPressed && !isDPressed
-                )
-            )
-                speed = 0.5f;
+            if (!enabled)
+                return;
+            g_position += right * deltaTime * speed;
+            if (speed < speedCap)
+                speed += speedInterval;
         }
+        if (isAPressed)
+        {
+            if (!enabled)
+                return;
+            g_position -= right * deltaTime * speed;
+            if (speed < speedCap)
+                speed += speedInterval;
+        }
+        if (isEscPressed)
+        {
+            if (enabled)
+                DisableControls();
+            else
+                EnableControls();
+        }
+        ViewMatrix = glm::lookAt(
+                g_position,
+                g_position+direction,
+                up
+            );
+        lastTime = currentTime;
     }
     static void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
     {
@@ -190,6 +168,10 @@ namespace renderer
             cos(horizontalAngle - 3.14f/2.0f)
         );
         up = glm::cross( right, direction );
+        if (up.y < 0)
+            up.y = 0;
+        if (up.y > 1)
+            up.y = 1;
         ViewMatrix = glm::lookAt(
                         g_position,
                         g_position+direction,

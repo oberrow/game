@@ -44,12 +44,12 @@ namespace renderer
         ~Program();
         friend class Shader;
     private:
-        bool m_initialized;
-        GLuint m_programId;
-        std::mutex m_lock;
-        std::list<class Shader*> m_attached;
-        std::string m_linkMessages;
-        bool m_linkSuccess;
+        bool m_initialized{};
+        GLuint m_programId = 0;
+        std::mutex m_lock{};
+        std::list<class Shader*> m_attached{};
+        std::string m_linkMessages{};
+        bool m_linkSuccess = false;
     };
     // Cannot be copied.
     // Cannot be moved.

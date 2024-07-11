@@ -14,8 +14,6 @@
 
 #include <renderer/vao.h>
 
-#include <glm/ext/matrix_float4x4.hpp>
-
 namespace renderer
 {
     class Mesh final : public RenderableObject
@@ -27,7 +25,6 @@ namespace renderer
         Mesh(Mesh&&) = delete;
         Mesh& operator=(Mesh&&) = delete;
 
-        bool Load(const char* objFile, size_t size);
         bool Load(const std::vector<GLfloat>& vertices, const std::vector<GLuint> indices);
 
         GLint Bind(VAO& to) override;
@@ -47,4 +44,10 @@ namespace renderer
         GLuint m_vbo = 0;
         GLuint m_eao = 0;
     };
+    bool LoadMesh(
+        const char* objFile, size_t size, 
+        std::vector<GLfloat> &vertices, std::vector<GLuint> &indices,
+        std::vector<GLfloat> &textureCoords,
+        std::vector<GLfloat> &normals
+    );
 }
