@@ -9,8 +9,7 @@
 
 #include <GLFW/glfw3.h>
 
-#include <glm/ext/matrix_transform.hpp>
-#include <stdio.h>
+
 #include <stdlib.h>
 
 #include <chrono>
@@ -20,7 +19,9 @@
 #include <renderer/vao.h>
 #include <renderer/mesh.h>
 #include <renderer/controls.h>
+#include <renderer/window_callbacks.h>
 
+#include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/matrix_float4x4.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/transform.hpp>
@@ -86,15 +87,7 @@ int main(int argc, const char** argv)
     glEnable(GL_CULL_FACE);
     glDepthFunc(GL_LESS);
 
-    int screenWidth = 0;
-    int screenHeight = 0;
-    glfwGetWindowSize(g_window, &screenWidth, &screenHeight);
 
-    glfwSetInputMode(g_window, GLFW_STICKY_KEYS, GL_TRUE);
-    glfwSetInputMode(g_window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-    glfwPollEvents();
-    glfwSetCursorPos(g_window, screenWidth/2.f, screenHeight/2.f);
-    
     logger::Debug("%s: Initializing GLEW.\n", __func__);
     GLenum err = glewInit();
     if (err != GLEW_OK)
@@ -135,7 +128,7 @@ int main(int argc, const char** argv)
         "   color = vertexColour;\n"
         "}"
     );
-    
+
     if (!status)
     {
         logger::Error("Fragment shader failed compile!\n%s\n", fragmentShader.GetCompileMessages().data());
@@ -145,7 +138,7 @@ int main(int argc, const char** argv)
     renderer::Program program;
     vertexShader.BindShader(program);
     fragmentShader.BindShader(program);
-    
+
     program.Link();
     renderer::VAO vao;
     renderer::Mesh meshObj;
@@ -162,12 +155,12 @@ int main(int argc, const char** argv)
     program.Use();
     GLuint MatrixID = program.GetUniformLocation("MVP");
     glClearColor(1,1,1,1);
+    renderer::EnableControls();
     logger::Log("Initialized renderer.\n");
     while (!glfwWindowShouldClose(g_window))
     {
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
-        renderer::CalculateNewMatrices();
         glm::mat4 mvp1 = renderer::ProjectionMatrix*renderer::ViewMatrix*glm::mat4(1.0f);
         glm::mat4 mvp2 = renderer::ProjectionMatrix*renderer::ViewMatrix*glm::translate(
             glm::mat4(1.0f), glm::vec3(5,0,0));
@@ -175,7 +168,7 @@ int main(int argc, const char** argv)
         auto start = std::chrono::system_clock::now().time_since_epoch().count();
 
         // Render shit here.
-        
+
         glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &mvp1[0][0]);
         vao.Render();
         glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &mvp2[0][0]);

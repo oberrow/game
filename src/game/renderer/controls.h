@@ -12,6 +12,8 @@ namespace renderer
 {
     extern glm::mat4 ViewMatrix;
     extern glm::mat4 ProjectionMatrix;
-    void CalculateNewMatrices();
+    extern float g_fov;
+    void DisableControls();
+    void EnableControls();
     extern glm::vec3 g_position;
 }
