@@ -16,13 +16,24 @@ target_include_directories(game PUBLIC ${GAME_EXTERNAL_INCLUDES} PRIVATE ${CMAKE
 find_package(OpenGL REQUIRED)
 find_package(glm REQUIRED)
 find_package(assimp REQUIRED)
+# find_package(ImGui REQUIRED)
+# find_package(Bullet REQUIRED)
 
 target_link_libraries(game
     PRIVATE ${CMAKE_SOURCE_DIR}/dependencies/GLEW/lib/libGLEW.a
     PRIVATE ${CMAKE_SOURCE_DIR}/dependencies/GLFW_Lib/lib/libglfw3.a
-    PRIVATE ${OPENGL_LIBRARY}
+    PRIVATE ${OPENGL_LIBRARIES}
     PRIVATE glm::glm
     PRIVATE assimp::assimp
+#   PRIVATE ${BULLET_LIBRARIES}
 )
+#target_include_directories(game PRIVATE ${BULLET_INCLUDE_DIR})
+
+if (DEFINED DEBUG_SCREEN)
+    target_link_libraries(game
+        PRIVATE imgui
+        PRIVATE stb
+    )
+endif()
 
 target_sources(game PRIVATE ${game_sources})

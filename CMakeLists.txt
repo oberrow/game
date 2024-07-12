@@ -55,4 +55,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED true)
 
 add_compile_definitions (GIT_SHA1="${GIT_SHA1}" GIT_DATE="${GIT_DATE}")
 
+if (DEFINED DEBUG_SCREEN)
+	add_compile_definitions(DEBUG_SCREEN=1)
+endif()
+
 add_subdirectory("src/game")

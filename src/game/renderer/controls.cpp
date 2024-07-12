@@ -23,18 +23,20 @@ static float verticalAngle = 0.0f;
 static const float initialSpeedWalk = 0.15f;
 static const float initialSpeedSprint = 0.35f;
 static const float speedCapWalk = 4.f;
-static const float speedCapSprint = 6.f;
+static const float speedCapSprint = 7.f;
 static const float speedIntervalWalk = .1f;
 static const float speedIntervalSprint = .3f;
-static float speed = 0;
-static float mouseSpeed = 0.0035f;
+
+bool g_dbgScreenEnabled;
 
 namespace renderer
 {
+    float g_speed = 0;
+    float g_mouseSpeed = 0.0055f; // sensitivity is g_mouseSpeed*10000
     glm::mat4 ViewMatrix{ 0 };
     glm::mat4 ProjectionMatrix{ 0 };
     
-    float g_fov = 60.0f;
+    float g_fov = 80.0f;
     glm::vec3 g_position = glm::vec3( 0, 3, 0 ); 
     static bool enabled = true;
     static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
@@ -43,6 +45,10 @@ namespace renderer
     {
         enabled = false;
         glfwSetInputMode(g_window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+    bool ControlsEnabled()
+    {
+        return enabled;
     }
     void EnableControls()
     {
@@ -61,7 +67,7 @@ namespace renderer
         ProjectionMatrix = glm::perspective(glm::radians(g_fov), (float)screenWidth/(float)screenHeight, 0.1f, 100.0f);
         glfwShowWindow(g_window);
     }
-    static glm::vec3 direction{0,0,0};
+    glm::vec3 g_direction{0,0,0};
     static glm::vec3 right{0,0,0};
     static glm::vec3 up{0,0,0};
     static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -73,6 +79,8 @@ namespace renderer
         
         static bool isCtrlPressed = false;
         static bool isEscPressed = false;
+
+        static bool isF3Pressed = false;
         
         switch (key)
         {
@@ -81,18 +89,21 @@ namespace renderer
         case GLFW_KEY_A: isAPressed = action == GLFW_PRESS || action == GLFW_REPEAT; break;
         case GLFW_KEY_D: isDPressed = action == GLFW_PRESS || action == GLFW_REPEAT; break;
         case GLFW_KEY_ESCAPE: isEscPressed = action == GLFW_PRESS || action == GLFW_REPEAT; break;
+        case GLFW_KEY_F3: isF3Pressed = action == GLFW_PRESS; break;
         default: return;
         }
+        if (isF3Pressed)
+            g_dbgScreenEnabled = !g_dbgScreenEnabled;
         bool prevCtrlStatus = isCtrlPressed;
         isCtrlPressed = (mods & GLFW_MOD_CONTROL);
         const float initialSpeed = isCtrlPressed ? initialSpeedSprint : initialSpeedWalk;
         const float speedCap = isCtrlPressed ? speedCapSprint : speedCapWalk;
         const float speedInterval = isCtrlPressed ? speedIntervalSprint : speedIntervalWalk;
         if (!isWPressed && !isSPressed && !isAPressed && !isDPressed)
-            speed = initialSpeed;
+            g_speed = initialSpeed;
         if (prevCtrlStatus != isCtrlPressed)
-            if (speed > speedCapWalk)
-                speed = speedCapWalk; // Slow down.
+            if (g_speed >= speedCapWalk)
+                g_speed = speedCapWalk-2; // Slow down.
         static double lastTime = glfwGetTime();
         double currentTime = glfwGetTime();
         float deltaTime = float(currentTime - lastTime);
@@ -100,33 +111,33 @@ namespace renderer
         {
             if (!enabled)
                     return;
-            g_position += direction * deltaTime * speed;
-            if (speed < speedCap)
-                speed += speedInterval;
+            g_position += g_direction * deltaTime * g_speed;
+            if (g_speed < speedCap)
+                g_speed += speedInterval;
         }
         if (isSPressed)
         {
             if (!enabled)
                 return;
-            g_position -= direction * deltaTime * speed;
-            if (speed < speedCap)
-                speed += speedInterval;
+            g_position -= g_direction * deltaTime * g_speed;
+            if (g_speed < speedCap)
+                g_speed += speedInterval;
         }
         if (isDPressed)
         {
             if (!enabled)
                 return;
-            g_position += right * deltaTime * speed;
-            if (speed < speedCap)
-                speed += speedInterval;
+            g_position += right * deltaTime * (g_speed > speedCapWalk ? speedCapWalk : g_speed);
+            if (g_speed < speedCap)
+                g_speed += speedIntervalWalk;
         }
         if (isAPressed)
         {
             if (!enabled)
                 return;
-            g_position -= right * deltaTime * speed;
-            if (speed < speedCap)
-                speed += speedInterval;
+            g_position -= right * deltaTime * (g_speed > speedCapWalk ? speedCapWalk : g_speed);
+            if (g_speed < speedCap)
+                g_speed += speedIntervalWalk;
         }
         if (isEscPressed)
         {
@@ -137,7 +148,7 @@ namespace renderer
         }
         ViewMatrix = glm::lookAt(
                 g_position,
-                g_position+direction,
+                g_position+g_direction,
                 up
             );
         lastTime = currentTime;
@@ -153,10 +164,10 @@ namespace renderer
 
         glfwSetCursorPos(g_window, screenWidth/2.f, screenHeight/2.f);
 
-        horizontalAngle += mouseSpeed * float(screenWidth/2.f - xpos );
-        verticalAngle   += mouseSpeed * float(screenHeight/2.f - ypos );
+        horizontalAngle += g_mouseSpeed * float(screenWidth/2.f - xpos );
+        verticalAngle   += g_mouseSpeed * float(screenHeight/2.f - ypos );
 
-        direction = glm::vec3(
+        g_direction = glm::vec3(
             cos(verticalAngle) * sin(horizontalAngle), 
             sin(verticalAngle),
             cos(verticalAngle) * cos(horizontalAngle)
@@ -167,14 +178,14 @@ namespace renderer
             0,
             cos(horizontalAngle - 3.14f/2.0f)
         );
-        up = glm::cross( right, direction );
-        if (up.y < 0)
-            up.y = 0;
-        if (up.y > 1)
-            up.y = 1;
+        up = glm::cross( right, g_direction );
+        // if (up.y < 0)
+        //     up.y = 0;
+        // if (up.y > 1)
+        //     up.y = 1;
         ViewMatrix = glm::lookAt(
                         g_position,
-                        g_position+direction,
+                        g_position+g_direction,
                         up
                     );
     }

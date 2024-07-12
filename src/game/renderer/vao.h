@@ -32,10 +32,13 @@ namespace renderer
         class VAO& GetVAO() const;
 
         virtual ~RenderableObject() {}
+        friend class VAO;
     protected:
         class VAO* m_vao = nullptr;
         bool m_initialized;
-        GLuint m_vaaIndex;
+        // Set to 0xffffffff if unused.
+        // Enabled and disabled by VAO::Render.
+        GLuint m_vaaIndex; 
         void add_to_vao();
         void remove_from_vao();
     };

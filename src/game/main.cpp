@@ -10,6 +10,12 @@
 
 #include <GLFW/glfw3.h>
 
+#ifdef DEBUG_SCREEN
+// NOTE(oberrow): Might only work on my system.
+#   include <imgui/imgui.h>
+#   include <imgui/backends/imgui_impl_glfw.h>
+#   include <imgui/backends/imgui_impl_opengl3.h>
+#endif
 
 #include <stdlib.h>
 
@@ -29,9 +35,11 @@
 #include <glm/trigonometric.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
 
+#include <glm/gtc/quaternion.hpp>
+#include <glm/gtx/quaternion.hpp>
+
 #include <file.h>
 #include <logger.h>
-#include <sys/types.h>
 
 GLFWwindow* g_window;
 
@@ -88,6 +96,22 @@ int main(int argc, const char** argv)
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glDepthFunc(GL_LESS);
+    // glEnable(GL_BLEND);
+    // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+#ifdef DEBUG_SCREEN
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+
+    ImGui_ImplGlfw_InitForOpenGL(g_window, true);
+
+    ImGui::StyleColorsDark();
+
+    ImGui_ImplOpenGL3_Init("#version 330 core");
+#endif
 
     logger::Debug("%s: Initializing GLEW.\n", __func__);
     GLenum err = glewInit();
@@ -128,7 +152,7 @@ int main(int argc, const char** argv)
         "\n"
         "void main()\n"
         "{\n"
-        "   color = texture(textureSampler, uv).rgba;\n"
+        "   color = vec4(texture(textureSampler, uv));\n"
         "}"
     );
 
@@ -141,8 +165,8 @@ int main(int argc, const char** argv)
     renderer::Program program;
     vertexShader.BindShader(program);
     fragmentShader.BindShader(program);
-
     program.Link();
+
     renderer::VAO vao;
     renderer::Mesh meshObj;
     renderer::Texture textureObj;
@@ -154,9 +178,9 @@ int main(int argc, const char** argv)
         glfwTerminate();
         return 1;
     }
-    if (!utility::LoadFile("cube.dds", texture))
+    if (!utility::LoadFile("cube.bmp", texture))
     {
-        logger::Error("Could not find file %s.", "cube.dds");
+        logger::Error("Could not find file %s.", "cube.bmp");
         glfwTerminate();
         return 1;
     }
@@ -178,15 +202,21 @@ int main(int argc, const char** argv)
     GLuint TextureSamplerId = program.GetUniformLocation("textureSampler");
     textureObj.SetTextureSamplerUniform(TextureSamplerId);
     glClearColor(0.0f, 0.0f, 0.4f, 0.0f);
+    glm::quat rotation = glm::quat(glm::vec3(90, 45, 0));
+    glm::mat4 rotationMatrix = glm::toMat4(rotation);
+    glm::mat4 model1{};
+    glm::mat4 model2{};
+    model1 = glm::translate(glm::mat4(1.f), glm::vec3(-0,0,0))*rotationMatrix*glm::mat4(1.f);
+    model2 = glm::translate(glm::mat4(1.f), glm::vec3( 5,0,0))*glm::mat4(1.f);
+
     renderer::EnableControls();
     logger::Log("Initialized renderer.\n");
     while (!glfwWindowShouldClose(g_window))
     {
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
-        glm::mat4 mvp1 = renderer::ProjectionMatrix*renderer::ViewMatrix*glm::mat4(1.0f);
-        glm::mat4 mvp2 = renderer::ProjectionMatrix*renderer::ViewMatrix*glm::translate(
-            glm::mat4(1.0f), glm::vec3(5,0,0));
+        glm::mat4 mvp1 = renderer::ProjectionMatrix*renderer::ViewMatrix*model1;
+        glm::mat4 mvp2 = renderer::ProjectionMatrix*renderer::ViewMatrix*model2;
 
         auto start = std::chrono::system_clock::now().time_since_epoch().count();
     
@@ -201,11 +231,48 @@ int main(int argc, const char** argv)
 
         auto end = std::chrono::system_clock::now().time_since_epoch().count();
 
-        logger::Debug("\rFPS: %f", 1.0f/(end-start)*std::chrono::system_clock::duration::period::den);
+#ifdef DEBUG_SCREEN
+        // Render debug screen shit here.        
+        if (g_dbgScreenEnabled)
+        {
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+
+            ImGui::Begin("Debug screen", &g_dbgScreenEnabled);
+            ImGui::Text("FPS: %f", 1.0f/(end-start)*std::chrono::system_clock::duration::period::den);
+            ImGui::Text("XYZ: %f,%f,%f", renderer::g_position.x,renderer::g_position.y,renderer::g_position.z);
+            ImGui::Text("Facing: %s,%s,%s", 
+                renderer::g_direction.x < 0 ? "-x" : renderer::g_direction.x == 0 ? "x" : "+x",
+                renderer::g_direction.y < 0 ? "-y" : renderer::g_direction.y == 0 ? "y" : "+y",
+                renderer::g_direction.z < 0 ? "-z" : renderer::g_direction.z == 0 ? "z" : "+z"
+            );
+            ImGui::Text("Speed: %f", renderer::g_speed);
+            ImGui::SliderFloat("FoV", &renderer::g_fov, 30, 120);
+            float sensivity = renderer::g_mouseSpeed*10000; 
+            if (ImGui::SliderFloat("Sensivity", &sensivity, 0, 100))
+                renderer::g_mouseSpeed = sensivity/10000;
+            bool value = renderer::ControlsEnabled();
+            if (ImGui::Checkbox("Enable input", &value))
+                value ? renderer::EnableControls() : renderer::DisableControls();
+            if (ImGui::Button("Stop"))
+                glfwSetWindowShouldClose(g_window, 1);
+            ImGui::End();
+        
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        }
+#endif
 
         glfwSwapBuffers(g_window);
         glfwPollEvents();
     }
+
+#ifdef DEBUG_SCREEN
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+#endif
 
     glfwTerminate();
 

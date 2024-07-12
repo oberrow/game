@@ -66,15 +66,14 @@ namespace renderer
         if (!m_vao)
             return GL_FALSE;
         // m_vao->Bind();
-        glEnableVertexAttribArray(m_vaaIndex);
+        // glEnableVertexAttribArray(m_vaaIndex);
         // Send the vertices to the shader.
         glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
         glVertexAttribPointer(m_vaaIndex, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
         // Render the mesh
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_eao);
         glDrawElements(GL_TRIANGLES, m_nVertices, GL_UNSIGNED_INT, nullptr);
-        // glDrawArrays(GL_TRIANGLES, 0, m_nVertices*3);
-        glDisableVertexAttribArray(m_vaaIndex);
+        // glDisableVertexAttribArray(m_vaaIndex);
         return GL_TRUE;
     }
     Mesh::~Mesh() 
@@ -98,7 +97,8 @@ namespace renderer
         auto scene = importer.ReadFileFromMemory(
             objFile, size,
              aiProcess_JoinIdenticalVertices |
-                     aiProcess_Triangulate
+                     aiProcess_Triangulate |
+                     aiProcess_SortByPType
                      );
         if (!scene)
         {

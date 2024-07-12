@@ -41,7 +41,10 @@ namespace renderer
         GLuint m_vbo = 0;
         GLuint m_textureObject = 0;
         GLuint m_textureSamplerUniform = 0;
-        const void* m_image = nullptr;
+        const void* m_image = nullptr; // Not guaranteed to exist after Bind call.
         size_t m_szImage = 0;
+        bool m_isDDSImage = false;
+        GLint BindDDSTexture();
+        GLint BindOtherFormatTexture(); // i.e., using stb_image.
     };
 }

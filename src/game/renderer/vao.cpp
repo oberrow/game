@@ -44,13 +44,13 @@ namespace renderer
             return GL_FALSE;
         if (Bind() == GL_FALSE)
             return GL_FALSE;
-        GLint status = 0;
         for (auto& i : m_objs)
         {
-            status = i->Render();
-            if (status == GL_FALSE)
-                return status;
+            glEnableVertexAttribArray(i->m_vaaIndex);
+            i->Render();
         }
+        for (auto& i : m_objs)
+            glDisableVertexAttribArray(i->m_vaaIndex);
         return GL_TRUE;
     }
     VAO::~VAO()
